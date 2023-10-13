@@ -18,6 +18,7 @@
 # Write your own HTTP GET and POST
 # The point is to understand what you have to send and get experience with it
 
+import json
 import sys
 import socket
 import re
@@ -44,7 +45,19 @@ class HTTPClient(object):
         return None
 
     def get_headers(self,data):
-        return None
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0', 
+            "Accept" : "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,/;q=0.8,application/signed-exchange;v=b3;q=0.7", 
+            "Accept-Language" : "en-US,en;q=0.9", 
+            "Accept-Encoding" : "gzip, deflate, br", 
+            "Upgrade-Insecure-Requests" : "1"}
+
+        request_headers = f""
+        for header_name, header_value in headers.items():
+            request_headers += f"{header_name}: {header_value}\r\n"
+        request_headers += "\r\n"  # End of headers
+
+        return request_headers
 
     def get_body(self, data):
         return None
@@ -66,38 +79,99 @@ class HTTPClient(object):
             else:
                 done = not part
         return buffer.decode('utf-8')
+    
+    def parsedURL(self, url):
+        # used https://docs.python.org/3/library/urllib.parse.html to understand how to use urllib.parse.urlparse()
+        parsed_url= urllib.parse.urlparse(url)              # 
+        host= parsed_url.hostname                           # 
+        path= parsed_url.path                               # Output: '/path/to/resource'
+        port = parsed_url.port if parsed_url.port else 80   # assuming port 80 is ok
 
+        return host, port, path
+    
     def GET(self, url, args=None):
         code = 500
         body = ""
 
-        response = requests.get(url)
+        host, port, path= self.parsedURL(url)
 
-        code= response.status_code
-        body= response.text
+        # GET request
+        self.connect(host, port)                                        # open conenction
+        self.sendall(f"GET {path} HTTP/1.1\r\nHost: {host}\r\n\r\n")    # send request
+        response_data = self.recvall(self.socket)                       # data from GET request
+        self.close()
 
-        headers = response.headers
+        # append headers 
+        response_data += self.get_headers(response_data)
+        print("after adding headers")
+        print(response_data)
 
-        print("Content-Type:", headers.get('Content-Type'))
-        print("Server:", headers.get('Server'))
+        response_lines = response_data.split('\r\n')
+        status_line = response_lines[0]
 
-        return HTTPResponse(code, body)
+        # Extract the status code from the status line
+        status_code = int(status_line.split(' ')[1])
+        print("checking status")
+        print(status_code)
+
+        # # response
+        if status_code==301:
+            return HTTPResponse(code=status_code, body=response_data)
+        if status_code==302:
+            return HTTPResponse(code=status_code, body=response_data)
+        if status_code== 200:
+            return HTTPResponse(code=status_code, body=response_data)
+        if status_code==404:
+            return HTTPResponse(code=status_code, body="Not Found")
+
+        # response
+        # if "HTTP/1.0 404" in response_data:
+        #     return HTTPResponse(code=404, body="Not Found")
+        # if "HTTP/1.0 301" in response_data:
+        #     return HTTPResponse(code=301, body="Not Found")
+        # else:
+        #     return HTTPResponse(code=200, body=response_data)
 
     def POST(self, url, args=None):
         code = 500
         body = ""
+
+        host, port, path = self.parsedURL(url)
+
+        # POST request
+        body = urllib.parse.urlencode(args) if args else ""
+        contentLength = len(body)
+
+        self.connect(host, port)
+        request = f"POST {path} HTTP/1.1\r\nHost: {host}\r\nContent-Length: {contentLength}\r\n\r\n{body}"
+        self.sendall(request)
+        response_data = self.recvall(self.socket)
+        self.close()
+
+        # TODO: get status code
+        # status= int(self.get_headers(response_data).split(' '))
+        # code= int(status)
         
-        response = requests.post(url, data=args)
+        # response
+        if not response_data:
+            return HTTPResponse(code=200, body="")
 
-        code = response.status_code
-        body= response.text
+        if "HTTP/1.0 404" in response_data:
+            return HTTPResponse(code=404, body="Not Found")
+        else:
+            return HTTPResponse(code=200, body=response_data.split('\r\n\r\n')[1])
 
-        headers = response.headers
         
-        print("Content-Type:", headers.get('Content-Type'))
-        print("Server:", headers.get('Server'))
+        # pain
+        # response = requests.post(url, data=args)
 
-        return HTTPResponse(code, body)
+        # # Response
+        # if "HTTP/1.0 404" in response_data:
+        #     return HTTPResponse(code=404, body="Not Found")
+        # elif response_json:
+        #     return HTTPResponse(code=200, body=response.text)
+        # else:
+        #     return HTTPResponse(code=200, body=response.text)
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
@@ -115,4 +189,3 @@ if __name__ == "__main__":
         print(client.command( sys.argv[2], sys.argv[1] ))
     else:
         print(client.command( sys.argv[1] ))
-
