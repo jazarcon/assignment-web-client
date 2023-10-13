@@ -84,7 +84,7 @@ class HTTPClient(object):
         # used https://docs.python.org/3/library/urllib.parse.html to understand how to use urllib.parse.urlparse()
         parsed_url= urllib.parse.urlparse(url)              # 
         host= parsed_url.hostname                           # 
-        path= parsed_url.path                               # Output: '/path/to/resource'
+        path= parsed_url.path                               # 
         port = parsed_url.port if parsed_url.port else 80   # assuming port 80 is ok
 
         return host, port, path
@@ -124,14 +124,6 @@ class HTTPClient(object):
         if status_code==404:
             return HTTPResponse(code=status_code, body="Not Found")
 
-        # response
-        # if "HTTP/1.0 404" in response_data:
-        #     return HTTPResponse(code=404, body="Not Found")
-        # if "HTTP/1.0 301" in response_data:
-        #     return HTTPResponse(code=301, body="Not Found")
-        # else:
-        #     return HTTPResponse(code=200, body=response_data)
-
     def POST(self, url, args=None):
         code = 500
         body = ""
@@ -147,10 +139,6 @@ class HTTPClient(object):
         self.sendall(request)
         response_data = self.recvall(self.socket)
         self.close()
-
-        # TODO: get status code
-        # status= int(self.get_headers(response_data).split(' '))
-        # code= int(status)
         
         # response
         if not response_data:
@@ -160,18 +148,6 @@ class HTTPClient(object):
             return HTTPResponse(code=404, body="Not Found")
         else:
             return HTTPResponse(code=200, body=response_data.split('\r\n\r\n')[1])
-
-        
-        # pain
-        # response = requests.post(url, data=args)
-
-        # # Response
-        # if "HTTP/1.0 404" in response_data:
-        #     return HTTPResponse(code=404, body="Not Found")
-        # elif response_json:
-        #     return HTTPResponse(code=200, body=response.text)
-        # else:
-        #     return HTTPResponse(code=200, body=response.text)
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
